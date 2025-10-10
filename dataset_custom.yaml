@@ -1,0 +1,21 @@
+path: ./  # dataset root dir
+train: tren  # train images folder
+val: vel    # validation images folder
+
+nc: 13  # number of classes
+
+names: [
+    "Anika",
+    "Arnav",
+    "Dev",
+    "Devi",
+    "Divyansh",
+    "Harshiv",
+    "Kaira",
+    "Neelashree",
+    "Prannav",
+    "Sidhant",
+    "Swastika",
+    "Tanaya",
+    "Vanshika"
+]

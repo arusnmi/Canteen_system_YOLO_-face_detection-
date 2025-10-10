@@ -1,0 +1,61 @@
+{
+  "categories": [
+    {
+      "id": 0,
+      "name": "Anika"
+    },
+    {
+      "id": 1,
+      "name": "Arnav"
+    },
+    {
+      "id": 2,
+      "name": "Dev"
+    },
+    {
+      "id": 3,
+      "name": "Devi"
+    },
+    {
+      "id": 4,
+      "name": "Divyansh"
+    },
+    {
+      "id": 5,
+      "name": "Harshiv"
+    },
+    {
+      "id": 6,
+      "name": "Kaira"
+    },
+    {
+      "id": 7,
+      "name": "Neelashree"
+    },
+    {
+      "id": 8,
+      "name": "Prannav"
+    },
+    {
+      "id": 9,
+      "name": "Sidhant"
+    },
+    {
+      "id": 10,
+      "name": "Swastika"
+    },
+    {
+      "id": 11,
+      "name": "Tanaya"
+    },
+    {
+      "id": 12,
+      "name": "Vanshika"
+    }
+  ],
+  "info": {
+    "year": 2025,
+    "version": "1.0",
+    "contributor": "Label Studio"
+  }
+}
