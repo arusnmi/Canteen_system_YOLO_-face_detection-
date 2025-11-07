@@ -18,24 +18,25 @@ class FaceDetector:
         self.cap = None
         self.is_running = False
         
-        # Load class labels - we know it's "a" and "b"
-        self.labels = ["a", "b"]
+        # Update class labels to include "c"
+        self.labels = ["a", "b", "c"]
         
-        # Initialize balance for each person
+        # Add balance for person c
         self.balances = {
             "a": 5000,
-            "b": 5000
+            "b": 5000,
+            "c": 5000  # Adding initial balance for person C
         }
         
-        # Display names for UI (optional - you can customize these)
+        # Add display name for person c
         self.display_names = {
             "a": "Person A",
-            "b": "Person B"
+            "b": "Person B",
+            "c": "Person C"  # Adding display name for person C
         }
         
         # Load face cascade for detection (optional, can be removed)
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-
     def check_time_and_deduct(self, name):
         current_time = datetime.now().time()
         

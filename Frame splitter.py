@@ -2,7 +2,7 @@ import cv2
 import os
 
 # === Configuration ===
-video_path = "VID20250923092929.mp4"      # Path to your input video
+video_path = "WIN_20251107_14_34_17_Pro.mp4"      # Path to your input video
 output_folder = "Frames"     # Folder where frames will be saved
 
 # Create the output folder if it doesn't exist
