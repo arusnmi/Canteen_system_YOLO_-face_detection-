@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy as np
+import json
 from datetime import datetime
 from kivy.app import App
 from kivy.uix.image import Image
@@ -9,6 +10,7 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
+from tensorflow.keras.models import load_model
 from deepface import DeepFace
 
 class FaceDetector:
@@ -16,85 +18,106 @@ class FaceDetector:
         self.cap = None
         self.is_running = False
         
-        # Database paths for the two people
-        self.database_a = "database/a"
-        self.database_b = "database/b"
+        # Load class labels - we know it's "a" and "b"
+        self.labels = ["a", "b"]
         
         # Initialize balance for each person
         self.balances = {
-            "Person A": 5000,
-            "Person B": 5000
+            "a": 5000,
+            "b": 5000
         }
         
-        # Load face cascade classifier
+        # Display names for UI (optional - you can customize these)
+        self.display_names = {
+            "a": "Person A",
+            "b": "Person B"
+        }
+        
+        # Load face cascade for detection (optional, can be removed)
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
     def check_time_and_deduct(self, name):
         current_time = datetime.now().time()
         
-        # Check for breakfast time (10:15 AM - 10:45 AM)
-        breakfast_start = datetime.strptime("10:00", "%H:%M").time()
-        breakfast_end = datetime.strptime("11:00", "%H:%M").time()
+        # Breakfast time (10:15 AM - 10:45 AM)
+        breakfast_start = datetime.strptime("10:15", "%H:%M").time()
+        breakfast_end = datetime.strptime("10:45", "%H:%M").time()
         
-        # Check for lunch time (1:00 PM - 1:45 PM)
-        lunch_start = datetime.strptime("12:45", "%H:%M").time()
-        lunch_end = datetime.strptime("14:00", "%H:%M").time()
-
-        snacks_start = datetime.strptime("15:00", "%H:%M").time()
-        snacks_end = datetime.strptime("16:00", "%H:%M").time()
+        # Lunch time (1:00 PM - 1:45 PM)
+        lunch_start = datetime.strptime("13:00", "%H:%M").time()
+        lunch_end = datetime.strptime("13:45", "%H:%M").time()
 
         if self.balances[name] <= 0:
             return "Insufficient funds, please refill"
 
         if breakfast_start <= current_time <= breakfast_end:
-            if self.balances[name] >= 74:
-                self.balances[name] -= 74
-                return f"Deducted 74 rs for breakfast for {name}. Balance: {self.balances[name]}"
+            if self.balances[name] >= 20:
+                self.balances[name] -= 20
+                display_name = self.display_names.get(name, name)
+                return f"Deducted 20rs for breakfast for {display_name}. Balance: {self.balances[name]}"
             return "Insufficient funds, please refill"
             
         elif lunch_start <= current_time <= lunch_end:
-            if self.balances[name] >= 115:
-                self.balances[name] -= 115
-                return f"Deducted 115 rs for lunch for {name}. Balance: {self.balances[name]}"
+            if self.balances[name] >= 50:
+                self.balances[name] -= 50
+                display_name = self.display_names.get(name, name)
+                return f"Deducted 50rs for lunch for {display_name}. Balance: {self.balances[name]}"
             return "Insufficient funds, please refill"
-        elif snacks_start <= current_time <= snacks_end:
-            if self.balances[name] >= 64:
-                self.balances[name] -= 64
-                return f"Deducted 64 rs for snacks for {name}. Balance: {self.balances[name]}"
-            return "Insufficient funds, please refill"
-        return "It is not breakfast, lunch or snack time right now"
+            
+        return "It is not lunch or snack time right now"
 
     def start_camera(self):
         if self.cap is None or not self.cap.isOpened():
             self.cap = cv2.VideoCapture(0)
             if self.cap.isOpened():
                 self.is_running = True
-                print("Camera started.")
             else:
-                print("Failed to open camera.")
                 self.is_running = False
     
     def stop_camera(self):
         if self.cap and self.cap.isOpened():
             self.cap.release()
             self.is_running = False
-            print("Camera stopped.")
 
     def verify_face(self, face_img):
         try:
-            # Try matching with person A
-            result_a = DeepFace.verify(face_img, self.database_a + "/image.jpg", enforce_detection=False)
-            if result_a['verified']:
-                return "Person A"
+            if face_img is None or face_img.size == 0:
+                return "Unknown"
+
+            # Save the face image temporarily
+            temp_path = "temp_face.jpg"
+            cv2.imwrite(temp_path, face_img)
+
+            # Use DeepFace for face verification
+            try:
+                result = DeepFace.find(
+                    img_path=temp_path,
+                    db_path='database',
+                    model_name='VGG-Face',
+                    enforce_detection=False
+                )
+
+                # Clean up temporary file
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+                if isinstance(result, list) and len(result) > 0 and not result[0].empty:
+                    # Get the first match
+                    first_match = result[0].iloc[0]
+                    # Extract the identity path
+                    identity_path = first_match['identity']
+                    # Get the class name (a or b) from the path
+                    person_name = identity_path.split(os.sep)[-2]
+                    return person_name
                 
-            # Try matching with person B
-            result_b = DeepFace.verify(face_img, self.database_b + "/image.jpg", enforce_detection=False)
-            if result_b['verified']:
-                return "Person B"
+                return "Unknown"
                 
-            return "Unknown"
+            except Exception as e:
+                print(f"DeepFace error: {e}")
+                return "Unknown"
+                
         except Exception as e:
-            print(f"Verification error: {e}")
+            print(f"Prediction error: {e}")
             return "Unknown"
 
     def process_frame(self, frame):
@@ -102,36 +125,49 @@ class FaceDetector:
             return frame, "Detector not ready"
 
         try:
-            # Convert to grayscale for face detection
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = self.face_cascade.detectMultiScale(gray, 1.1, 4)
-            
-            for (x, y, w, h) in faces:
-                # Extract face region
-                face_img = frame[y:y+h, x:x+w]
-                
-                # Verify face
-                person = self.verify_face(face_img)
-                
-                if person != "Unknown":
-                    message = self.check_time_and_deduct(person)
-                    
-                    # Draw bounding box
-                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                    cv2.putText(frame, f"{person}: {message}", (x, y-10),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                    
-                    return frame, message
-                else:
-                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
-                    cv2.putText(frame, "Unknown", (x, y-10),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            # Use DeepFace to extract faces directly from the frame
+            faces = DeepFace.extract_faces(frame, enforce_detection=False)
 
+            if faces:
+                for face in faces:
+                    # Get the face image and its coordinates
+                    face_img = face['face']
+                    facial_area = face['facial_area']
+                    
+                    # Extract coordinates from facial_area
+                    if isinstance(facial_area, dict):
+                        x = facial_area.get('x', 0)
+                        y = facial_area.get('y', 0)
+                        w = facial_area.get('w', 0)
+                        h = facial_area.get('h', 0)
+                    else:
+                        # If facial_area is a numpy array or list
+                        facial_area = np.array(facial_area).ravel()
+                        if len(facial_area) >= 4:
+                            x, y, w, h = facial_area[:4]
+                        else:
+                            continue
+                    
+                    person = self.verify_face(face_img)
+                    
+                    if person != "Unknown":
+                        message = self.check_time_and_deduct(person)
+                        display_name = self.display_names.get(person, person)
+                        # Draw rectangle around the detected face
+                        cv2.rectangle(frame, (int(x), int(y)), (int(x + w), int(y + h)), (0, 255, 0), 2)
+                        cv2.putText(frame, f"{display_name}: {message}", (int(x), int(y-10)),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    else:
+                        cv2.putText(frame, "Unknown", (int(x), int(y-10)),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+                return frame, "Face(s) detected"
+                
             return frame, "No recognized face detected"
             
         except Exception as e:
             print(f"Processing error: {e}")
-            return frame, f"Processing Error: {e}"
+            return frame, "Processing Error"
 
 class FaceDetectorApp(App):
     def __init__(self, **kwargs):
@@ -143,12 +179,9 @@ class FaceDetectorApp(App):
         self.title = 'Face Detection System'
         
         root = BoxLayout(orientation='vertical')
-        
-        # Camera View
         self.camera_widget = Image(allow_stretch=True, keep_ratio=False)
         root.add_widget(self.camera_widget)
         
-        # Status Label
         self.status_label = Label(
             text="Press START to begin detection",
             size_hint_y=None,
@@ -157,7 +190,6 @@ class FaceDetectorApp(App):
         )
         root.add_widget(self.status_label)
         
-        # Control Button
         self.control_button = Button(
             text="START DETECTION",
             size_hint_y=None,
@@ -178,7 +210,6 @@ class FaceDetectorApp(App):
     def start_detection(self, instance):
         instance.text = "STOP DETECTION"
         instance.background_color = (0.7, 0.25, 0.25, 1)
-        
         self.status_label.text = "Starting camera..."
         self.detector.start_camera()
         
@@ -193,7 +224,6 @@ class FaceDetectorApp(App):
     def stop_detection(self, instance):
         instance.text = "START DETECTION"
         instance.background_color = (0.25, 0.7, 0.25, 1)
-        
         self.status_label.text = "Detection stopped."
         self.detector.stop_camera()
         if self.update_event:
@@ -210,10 +240,8 @@ class FaceDetectorApp(App):
                 processed_frame, detection_text = self.detector.process_frame(frame)
                 self.status_label.text = detection_text
 
-                # Convert frame for Kivy
                 frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
                 frame_flipped = cv2.flip(frame_rgb, 0)
-                
                 buf = frame_flipped.tobytes()
                 texture = Texture.create(
                     size=(frame_rgb.shape[1], frame_rgb.shape[0]),
@@ -222,8 +250,7 @@ class FaceDetectorApp(App):
                 texture.blit_buffer(buf, colorfmt='rgb', bufferfmt='ubyte')
                 self.camera_widget.texture = texture
                 
-        except Exception as e:
-            print(f"Camera update error: {e}")
+        except Exception:
             self.stop_detection(self.control_button)
 
     def on_stop(self):
